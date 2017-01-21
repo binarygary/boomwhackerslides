@@ -2,178 +2,319 @@
 <head>
 	<meta charset="UTF-8">
 	<title>Web MIDI API Test</title>
+
+	<script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+	<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+	<link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/smoothness/jquery-ui.css">
+
 	<style>
-	*:before, *:after {
-			-webkit-box-sizing: border-box;
-			-moz-box-sizing: border-box;
-			box-sizing: border-box;
+		body {
+			width: 100%;
+			height: 100%;
+			display: flex;
 		}
-		h4 {
-			margin: 0 0 5px 0;
+
+		#kbd {
+			height: 100%;
+			padding: 1%;
+			flex-flow: column;
+			display: flex;
+			flex: 4;
 		}
-		p {
-			margin: 0 0 10px 0;
+
+		#keys {
+			height: 100%;
+			display: flex;
+			flex: 8;
+			justify-content: center;
+
 		}
-		#content, #device_info {
-			max-width: 800px;
-			margin: 0 auto;
-			padding: 10px 0;
-			font-family: sans-serif;
-			font-size: 12px;
-			line-height: 12px;
-			letter-spacing: 1.5px;
+
+		.note {
+			flex: 1;
+			display: inline-flex;
+			align-items: center;
+			border: 1px black solid;
 		}
-		#content, #key_data {
-			margin-top: 0px;
-			text-align: center;
-		}
-		#inputs, #outputs {
-			display: inline-block;
-			width: 49%;
-			margin-top: 10px;
-			vertical-align: top;
-		}
-		#outputs {
-			text-align: right;
-		}
-		.info {
-			padding: 20px;
-			border-radius: 3px;
-			box-shadow: inset 0 0 10px #ccc;
-			background-color: rgba(233,233,233,0.25);
-		}
-		.small {
-			border-bottom: 1px solid #ccc;
-			margin-left: 10px;
-		}
-		p:not(.small){
-			text-transform: uppercase;
-			font-weight: 800;
+
+		.black {
+
+			justify-content: center;
+			position: relative;
+			height: 70%;
+			background-color: #474747;
+			color: white;
+			width: 8%;
+			margin: 0 -4%
 		}
 	</style>
 </head>
 <body>
-	<div id="device_info">
-		<h1 class='device-name'></h1>
-		<div id="key_data"></div>
-		<div id="inputs"></div>
-		<div id="outputs"></div>
+
+<div id="kbd">
+
+	<div id="keys">
+
+		<div class="note white c"></div>
+		<div class="note black cs"></div>
+		<div class="note white d"></div>
+		<div class="note black ds"></div>
+		<div class="note white e"></div>
+		<div class="note white f"></div>
+		<div class="note black fs"></div>
+		<div class="note white g"></div>
+		<div class="note black gs"></div>
+		<div class="note white a"></div>
+		<div class="note black as"></div>
+		<div class="note white b"></div>
+		<div class="note white c"></div>
+
 	</div>
-	<script>
-	(function(){
-		var log = console.log.bind(console), keyData = document.getElementById('key_data'), 
-				deviceInfoInputs = document.getElementById('inputs'), deviceInfoOutputs = document.getElementById('outputs'), 
-				device = document.querySelector('.device-name'), midi;
 
-		// request MIDI access
-		if(navigator.requestMIDIAccess){
-			navigator.requestMIDIAccess({sysex: false}).then(onMIDISuccess, onMIDIFailure);
-		}
-		else {
-			alert("No MIDI support in your browser.");
-		}
+</div>
 
-		// midi functions
-		function onMIDISuccess(midiAccess){
-			midi = midiAccess;
-			var inputs = midi.inputs.values();
-			// loop through all inputs
-			for(var input = inputs.next(); input && !input.done; input = inputs.next()){
-				// listen for midi messages
-				input.value.onmidimessage = onMIDIMessage;
+<div id="device_info">
+	<div id="key_data"></div>
+	<div id="inputs"></div>
+	<div id="outputs"></div>
+</div>
+<script>
 
-				listInputs(input);
+	$( document ).ready( function () {
+		(function () {
+			var log                                                                       = console.log.bind( console ), keyData = document.getElementById( 'key_data' ),
+				deviceInfoInputs = document.getElementById( 'inputs' ), deviceInfoOutputs = document.getElementById( 'outputs' ),
+				device                                                                    = document.querySelector( '.device-name' ), midi;
+
+			// request MIDI access
+			if ( navigator.requestMIDIAccess ) {
+				navigator.requestMIDIAccess( { sysex: false } ).then( onMIDISuccess, onMIDIFailure );
 			}
-			// listen for connect/disconnect message
-			midi.onstatechange = onStateChange;
-
-			showMIDIPorts(midi);
-		}
-
-		function onMIDIMessage(event){
-			var data = event.data, 
-					cmd = data[0] >> 4,
-					channel = data[0] & 0xf,
-					type = data[0], // ignore [inconsistent between devices]
-					note = data[1], 
-					velocity = data[2];
-					
-			if (velocity) {
-				noteOn(note, velocity);
+			else {
+				alert( "No MIDI support in your browser." );
 			}
-			else{
-				noteOff(note, velocity);
+
+			// midi functions
+			function onMIDISuccess( midiAccess ) {
+				midi       = midiAccess;
+				var inputs = midi.inputs.values();
+				// loop through all inputs
+				for ( var input = inputs.next(); input && !input.done; input = inputs.next() ) {
+					// listen for midi messages
+					input.value.onmidimessage = onMIDIMessage;
+
+					listInputs( input );
+				}
+				// listen for connect/disconnect message
+				midi.onstatechange = onStateChange;
+
+				//showMIDIPorts(midi);
 			}
-			log('data', data, 'cmd', cmd, 'channel', channel);
-			logger(keyData, 'key data', data);
-		}
 
-		function onStateChange(event){
-			var port = event.port, state = port.state, name = port.name, type = port.type;
-			device.textContent = name.replace(/port.*/i, '');
-			showMIDIPorts(midi);
-			if(type == "input")
-				log("name", name, "port", port, "state", state);
+			function onMIDIMessage( event ) {
+				var data     = event.data,
+					cmd      = data[ 0 ] >> 4,
+					channel  = data[ 0 ] & 0xf,
+					type     = data[ 0 ], // ignore [inconsistent between devices]
+					note     = data[ 1 ],
+					velocity = data[ 2 ];
 
-		}
+				if ( velocity > 64 ) {
+					noteOn( note, velocity );
+				} else {
+					noteOff( note, velocity );
+				}
+				//log('data', data, 'cmd', cmd, 'channel', channel);
+				//logger(keyData, 'key data', data);
+			}
 
-		function listInputs(inputs){
-			var input = inputs.value;
-			device.textContent = input.name.replace(/port.*/i, '');
-				log("Input port : [ type:'" + input.type + "' id: '" + input.id + 
-						"' manufacturer: '" + input.manufacturer + "' name: '" + input.name + 
-						"' version: '" + input.version + "']");
-		}
+			function onStateChange( event ) {
+				var port = event.port, state = port.state, name = port.name, type = port.type;
+				//device.textContent = name.replace(/port.*/i, '');
+				showMIDIPorts( midi );
+				if ( type == "input" )
+					log( "name", name, "port", port, "state", state );
 
-		function noteOn(midiNote, velocity){
-			
-		}
+			}
 
-		function noteOff(midiNote, velocity){
-			
-		}
+			function listInputs( inputs ) {
+				var input = inputs.value;
+				//device.textContent = input.name.replace(/port.*/i, '');
+				log( "Input port : [ type:'" + input.type + "' id: '" + input.id +
+						"' manufacturer: '" + input.manufacturer + "' name: '" + input.name +
+						"' version: '" + input.version + "']" );
+			}
+
+			function keyPress( keyName, color ) {
+				$( keyName ).css( "background-color", color );
+			}
+
+			function keyUp( keyName, color ) {
+				if ( 'white' == color ){
+					color = '#FFFFFF';
+				} else {
+					color = '#474747';
+				}
+				$( keyName ).animate( { backgroundColor: color }, 50 );
+			}
 
 
-		function onMIDIFailure(e){
-			log("No access to MIDI devices or your browser doesn't support WebMIDI API. Please use WebMIDIAPIShim " + e);
-		}
-		
-		// MIDI utility functions
-		function showMIDIPorts(midiAccess){
-			var inputs = midiAccess.inputs,
-					outputs = midiAccess.outputs, 
+			c  = [ 0, 12, 24, 36, 48, 60, 72, 84, 96, 108, 120 ];
+			cs = c.map( function ( value ) {
+				return value + 1;
+			} );
+			d  = cs.map( function ( value ) {
+				return value + 1;
+			} );
+			ds = d.map( function ( value ) {
+				return value + 1;
+			} );
+			e  = ds.map( function ( value ) {
+				return value + 1;
+			} );
+			f  = e.map( function ( value ) {
+				return value + 1;
+			} );
+			fs = f.map( function ( value ) {
+				return value + 1;
+			} );
+			g  = fs.map( function ( value ) {
+				return value + 1;
+			} );
+			gs = g.map( function ( value ) {
+				return value + 1;
+			} );
+			a  = gs.map( function ( value ) {
+				return value + 1;
+			} );
+			as = a.map( function ( value ) {
+				return value + 1;
+			} );
+			b  = as.map( function ( value ) {
+				return value + 1;
+			} );
+
+			function noteOn( midiNote, velocity ) {
+				if ( c.includes( midiNote ) ) {
+					keyPress( '.c', '#FF0000' );
+				}
+				if ( cs.includes( midiNote ) ) {
+					keyPress( '.cs', '#FF0000' );
+				}
+				if ( d.includes( midiNote ) ) {
+					keyPress( '.d', '#FFA500' );
+				}
+				if ( ds.includes( midiNote ) ) {
+					keyPress( '.ds', '#FFA500' );
+				}
+				if ( e.includes( midiNote ) ) {
+					keyPress( '.e', '#FFFF00' );
+				}
+				if ( f.includes( midiNote ) ) {
+					keyPress( '.f', '#7FFF0' );
+				}
+				if ( fs.includes( midiNote ) ) {
+					keyPress( '.fs', '#7FFF0' );
+				}
+				if ( g.includes( midiNote ) ) {
+					keyPress( '.g', '#008000' );
+				}
+				if ( gs.includes( midiNote ) ) {
+					keyPress( '.gs', '#008000' );
+				}
+				if ( a.includes( midiNote ) ) {
+					keyPress( '.a', '#800080' );
+				}
+				if ( as.includes( midiNote ) ) {
+					keyPress( '.as', '#800080' );
+				}
+				if ( b.includes( midiNote ) ) {
+					keyPress( '.b', '#FFC0CB' );
+				}
+			}
+
+			function noteOff( midiNote, velocity ) {
+				if ( c.includes( midiNote ) ) {
+					keyUp( '.c', 'white' );
+				}
+				if ( cs.includes( midiNote ) ) {
+					keyUp( '.cs', 'black' );
+				}
+				if ( d.includes( midiNote ) ) {
+					keyUp( '.d', 'white' );
+				}
+				if ( ds.includes( midiNote ) ) {
+					keyUp( '.ds', 'black' );
+				}
+				if ( e.includes( midiNote ) ) {
+					keyUp( '.e', 'white' );
+				}
+				if ( f.includes( midiNote ) ) {
+					keyUp( '.f', 'white' );
+				}
+				if ( fs.includes( midiNote ) ) {
+					keyUp( '.fs', 'black' );
+				}
+				if ( g.includes( midiNote ) ) {
+					keyUp( '.g', 'white' );
+				}
+				if ( gs.includes( midiNote ) ) {
+					keyUp( '.gs', 'black' );
+				}
+				if ( a.includes( midiNote ) ) {
+					keyUp( '.a', 'white' );
+				}
+				if ( as.includes( midiNote ) ) {
+					keyUp( '.as', 'black' );
+				}
+				if ( b.includes( midiNote ) ) {
+					keyUp( '.b', 'white' );
+				}
+			}
+
+
+			function onMIDIFailure( e ) {
+				log( "No access to MIDI devices or your browser doesn't support WebMIDI API. Please use WebMIDIAPIShim " + e );
+			}
+
+			// MIDI utility functions
+			function showMIDIPorts( midiAccess ) {
+				var inputs  = midiAccess.inputs,
+					outputs = midiAccess.outputs,
 					html;
-			html = '<h4>MIDI Inputs:</h4><div class="info">';
-			inputs.forEach(function(port){
-				html += '<p>' + port.name + '<p>';
-				html += '<p class="small">connection: ' + port.connection + '</p>';
-				html += '<p class="small">state: ' + port.state + '</p>';
-				html += '<p class="small">manufacturer: ' + port.manufacturer + '</p>';
-				if(port.version){
-					html += '<p class="small">version: ' + port.version + '</p>';
-				}
-			});
-			deviceInfoInputs.innerHTML = html + '</div>';
+				html        = '<h4>MIDI Inputs:</h4><div class="info">';
+				inputs.forEach( function ( port ) {
+					html += '<p>' + port.name + '<p>';
+					html += '<p class="small">connection: ' + port.connection + '</p>';
+					html += '<p class="small">state: ' + port.state + '</p>';
+					html += '<p class="small">manufacturer: ' + port.manufacturer + '</p>';
+					if ( port.version ) {
+						html += '<p class="small">version: ' + port.version + '</p>';
+					}
+				} );
+				deviceInfoInputs.innerHTML = html + '</div>';
 
-			html = '<h4>MIDI Outputs:</h4><div class="info">';
-			outputs.forEach(function(port){
-				html += '<p>' + port.name + '<br>';
-				html += '<p class="small">manufacturer: ' + port.manufacturer + '</p>';
-				if(port.version){
-					html += '<p class="small">version: ' + port.version + '</p>';
-				}
-			});
-			deviceInfoOutputs.innerHTML = html + '</div>';
-		}
+				html = '<h4>MIDI Outputs:</h4><div class="info">';
+				outputs.forEach( function ( port ) {
+					html += '<p>' + port.name + '<br>';
+					html += '<p class="small">manufacturer: ' + port.manufacturer + '</p>';
+					if ( port.version ) {
+						html += '<p class="small">version: ' + port.version + '</p>';
+					}
+				} );
+				deviceInfoOutputs.innerHTML = html + '</div>';
+			}
 
 
-		// utility functions
-		function logger(container, label, data){
-			messages = label + " [cmd: " + (data[0] >> 4) + ", type: " + data[0] + " , note: " + data[1] + " , velocity: " + data[2] + "]";
-			container.textContent = messages;
-		}
+			// utility functions
+			function logger( container, label, data ) {
+				messages              = label + " [cmd: " + (data[ 0 ] >> 4) + ", type: " + data[ 0 ] + " , note: " + data[ 1 ] + " , velocity: " + data[ 2 ] + "]";
+				container.textContent = messages;
+			}
 
-	})();
-	</script>
+		})();
+
+	} );
+</script>
 </body>
 </html>
